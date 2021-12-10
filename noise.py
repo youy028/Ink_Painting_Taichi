@@ -1,6 +1,8 @@
 import taichi as ti
 import numpy as np
 import taichi_glsl as ts
+from PIL import Image
+import cv2
 
 ti.init(arch=ti.gpu)
 
@@ -18,7 +20,7 @@ def smooth_lerp(vl, vr, frac):
 
 @ti.func
 def noise(i, j):
-    return ts.fract(ti.sin(i * 127.1 + j * 311.7) * 4378.245233)
+    return ts.fract(ti.sin(i * 12.9898 + j * 78.233) * 43758.5453)
 
 
 @ti.func
@@ -43,7 +45,7 @@ def fbm(x: ti.f32, y: ti.f32):
     persistence = 0.5
     total = 0.0
     for i in range(10):
-        freq = 3 ** i
+        freq = 2 ** i
         amp = persistence ** i
         total += interp_noise(x * freq, y * freq) * amp
     return ts.scalar.clamp(total * 0.5)
@@ -52,14 +54,41 @@ def fbm(x: ti.f32, y: ti.f32):
 @ti.kernel
 def init():
     for i, j in ti.ndrange(nx, ny):
-        # pic[i, j] = noise(i * 0.05, j * 0.05)
-        pic[i, j] = ts.scalar.smoothstep(fbm(ti.cast(i * 0.05, ti.f32), ti.cast(j * 0.05, ti.f32)) ** 3.5)
+        pic[i, j] = noise(i * 0.05, j * 0.05)
+        # pic[i, j] = ts.scalar.smoothstep(fbm(ti.cast(i * 0.05, ti.f32), ti.cast(j * 0.05, ti.f32)), 0.2, 0.8)
 
+@ti.kernel
+def avg_lum() -> ti.f32:
+    avg_lum = 0.0
+    for i, j in pic:
+        avg_lum += pic[i, j] / (nx * ny)
+    return avg_lum
+
+@ti.kernel
+def test_bilerp1() -> ti.f32:
+    return ts.sampling.bilerp(pic, ts.vec2(1.5, 1.0))
+
+@ti.kernel
+def test_bilerp2() -> ti.f32:
+    return ts.sampling.bilerp(pic, ts.vec2(1.0, 1.0))
+
+@ti.kernel
+def test_bilerp3() -> ti.f32:
+    return ts.sampling.bilerp(pic, ts.vec2(2.0, 1.0))
 
 if __name__ == '__main__':
     init()
-    gui = ti.GUI('lbm solver', (nx, ny))
-    pic_np = pic.to_numpy()
-    while True:
-        gui.set_image(pic_np)
-        gui.show()
+    print(test_bilerp1())
+    print(test_bilerp2())
+    print(test_bilerp3())
+    # # print(avg_lum())
+    # gui = ti.GUI('lbm solver', (nx, ny))
+    # pic_np = pic.to_numpy()
+    # while True:
+    #     gui.set_image(pic_np)
+    #     gui.show()
+
+
+
+    # print(type(numpydata))
+    # print(numpydata.shape)
